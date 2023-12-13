@@ -1,0 +1,24 @@
+emulators:
+  - gb
+  - gbc
+  - gba
+  - snes
+  - n64
+file_types:
+  roms: false
+  saves: true
+  states: true
+storage:
+  google_drive:
+    enabled: false
+  aws:
+    credentials_file: $HOME/.aws/credentials
+    s3:
+      enabeld: false
+      bucket: my-retropie-backups
+  sftp:
+    enabled: false
+    username: user
+    password: pass
+    port: 22
+    remote_dir: /
