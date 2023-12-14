@@ -11,7 +11,7 @@ const (
 	Rom FileType = iota
 	Save
 	State
-	Unsupported
+	Generic
 )
 
 var (
@@ -63,7 +63,7 @@ func (f *File) IsOlderThan(other *File) bool {
 func parseFiletype(filename string) FileType {
 	ft, ok := suffixToFileType[filepath.Ext(filename)]
 	if !ok {
-		return Unsupported
+		return Generic
 	}
 	return ft
 }
