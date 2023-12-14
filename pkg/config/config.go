@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/TrevorEdris/retropie-utils/pkg/storage"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 )
@@ -23,26 +24,9 @@ type (
 	}
 
 	Storage struct {
-		GoogleDrive GoogleDrive
-		S3          S3
-		SFTP        SFTP
-	}
-
-	GoogleDrive struct {
-		Enabled bool
-	}
-
-	S3 struct {
-		Enabled bool
-		Bucket  string
-	}
-
-	SFTP struct {
-		Enabled   bool
-		Username  string
-		Password  string
-		Port      int
-		RemoteDir string
+		GoogleDrive storage.GDriveConfig
+		S3          storage.S3Config
+		SFTP        storage.SFTPConfig
 	}
 )
 
@@ -54,14 +38,14 @@ var example = Config{
 		States: true,
 	},
 	Storage: Storage{
-		GoogleDrive: GoogleDrive{
+		GoogleDrive: storage.GDriveConfig{
 			Enabled: false,
 		},
-		S3: S3{
+		S3: storage.S3Config{
 			Enabled: true,
 			Bucket:  "retropie-sync",
 		},
-		SFTP: SFTP{
+		SFTP: storage.SFTPConfig{
 			Enabled: false,
 		},
 	},

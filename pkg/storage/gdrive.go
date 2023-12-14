@@ -3,18 +3,21 @@ package storage
 import (
 	"context"
 
-	"github.com/TrevorEdris/retropie-utils/pkg/config"
 	"github.com/TrevorEdris/retropie-utils/pkg/errors"
 	"github.com/TrevorEdris/retropie-utils/pkg/fs"
 )
 
 type (
 	gdrive struct {
-		cfg config.GoogleDrive
+		cfg GDriveConfig
+	}
+
+	GDriveConfig struct {
+		Enabled bool
 	}
 )
 
-func NewGoogleDriveStorage(cfg config.GoogleDrive) (Storage, error) {
+func NewGoogleDriveStorage(cfg GDriveConfig) (Storage, error) {
 	return &gdrive{cfg}, nil
 }
 

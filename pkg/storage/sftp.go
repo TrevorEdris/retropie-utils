@@ -3,18 +3,25 @@ package storage
 import (
 	"context"
 
-	"github.com/TrevorEdris/retropie-utils/pkg/config"
 	"github.com/TrevorEdris/retropie-utils/pkg/errors"
 	"github.com/TrevorEdris/retropie-utils/pkg/fs"
 )
 
 type (
 	sftp struct {
-		cfg config.SFTP
+		cfg SFTPConfig
+	}
+
+	SFTPConfig struct {
+		Enabled   bool
+		Username  string
+		Password  string
+		Port      int
+		RemoteDir string
 	}
 )
 
-func NewSFTPStorage(cfg config.SFTP) (Storage, error) {
+func NewSFTPStorage(cfg SFTPConfig) (Storage, error) {
 	return &sftp{cfg}, nil
 }
 

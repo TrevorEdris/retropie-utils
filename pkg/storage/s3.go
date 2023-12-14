@@ -5,24 +5,28 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/TrevorEdris/retropie-utils/pkg/config"
 	"github.com/TrevorEdris/retropie-utils/pkg/fs"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 type (
 	s3 struct {
-		awsCfg   awsconfig.Config
+		awsCfg   config.Config
 		uploader *manager.Uploader
-		cfg      config.S3
+		cfg      S3Config
+	}
+
+	S3Config struct {
+		Enabled bool
+		Bucket  string
 	}
 )
 
-func NewS3Storage(cfg config.S3) (Storage, error) {
+func NewS3Storage(cfg S3Config) (Storage, error) {
 	awscfg, err := newAwsConfig(context.TODO())
 	if err != nil {
 		return nil, err
@@ -35,11 +39,16 @@ func NewS3Storage(cfg config.S3) (Storage, error) {
 }
 
 func (s *s3) Store(ctx context.Context, file *fs.File) error {
+	if !s.cfg.Enabled {
+		return nil
+	}
+
 	f, err := os.Open(file.Absolute)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
+
 	_, err = s.uploader.Upload(
 		ctx,
 		&awss3.PutObjectInput{
@@ -51,6 +60,7 @@ func (s *s3) Store(ctx context.Context, file *fs.File) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
