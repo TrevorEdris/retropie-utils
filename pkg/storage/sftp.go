@@ -21,6 +21,8 @@ type (
 	}
 )
 
+var _ Storage = &sftp{}
+
 func NewSFTPStorage(cfg SFTPConfig) (Storage, error) {
 	return &sftp{cfg}, nil
 }
