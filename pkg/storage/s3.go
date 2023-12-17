@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/TrevorEdris/retropie-utils/pkg/fs"
 
@@ -40,7 +41,7 @@ func NewS3Storage(cfg S3Config) (Storage, error) {
 	}, nil
 }
 
-func (s *s3) Store(ctx context.Context, file *fs.File) error {
+func (s *s3) Store(ctx context.Context, remoteDir string, file *fs.File) error {
 	if !s.cfg.Enabled {
 		return nil
 	}
@@ -51,11 +52,17 @@ func (s *s3) Store(ctx context.Context, file *fs.File) error {
 	}
 	defer f.Close()
 
+	remoteDir, _ = strings.CutSuffix(remoteDir, "/")
+	dir := fmt.Sprintf("%s/%s", file.Dir, file.Name)
+	if remoteDir != "" {
+		dir = fmt.Sprintf("%s/%s", remoteDir, dir)
+	}
+
 	_, err = s.uploader.Upload(
 		ctx,
 		&awss3.PutObjectInput{
 			Bucket: aws.String(s.cfg.Bucket),
-			Key:    aws.String(fmt.Sprintf("%s/%s", file.Dir, file.Name)),
+			Key:    aws.String(fmt.Sprintf("%s/%s/%s", remoteDir, file.Dir, file.Name)),
 			Body:   f,
 		},
 	)
@@ -66,9 +73,9 @@ func (s *s3) Store(ctx context.Context, file *fs.File) error {
 	return nil
 }
 
-func (s *s3) StoreAll(ctx context.Context, files []*fs.File) error {
+func (s *s3) StoreAll(ctx context.Context, remoteDir string, files []*fs.File) error {
 	for _, f := range files {
-		err := s.Store(ctx, f)
+		err := s.Store(ctx, remoteDir, f)
 		if err != nil {
 			return err
 		}

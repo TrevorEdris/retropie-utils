@@ -14,9 +14,9 @@ var _ = Describe("Gdrive", func() {
 	It("is not implemented", func() {
 		client, err := storage.NewGoogleDriveStorage(storage.GDriveConfig{})
 		Expect(err).NotTo(HaveOccurred())
-		err = client.Store(context.TODO(), nil)
+		err = client.Store(context.TODO(), "", nil)
 		Expect(err).To(MatchError(errors.NotImplementedError))
-		err = client.StoreAll(context.TODO(), nil)
+		err = client.StoreAll(context.TODO(), "", nil)
 		Expect(err).To(MatchError(errors.NotImplementedError))
 	})
 })

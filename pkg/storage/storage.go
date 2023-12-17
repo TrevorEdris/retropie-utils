@@ -8,7 +8,7 @@ import (
 
 type (
 	Storage interface {
-		Store(ctx context.Context, file *fs.File) error
-		StoreAll(ctx context.Context, files []*fs.File) error
+		Store(ctx context.Context, remoteDir string, file *fs.File) error
+		StoreAll(ctx context.Context, remoteDir string, files []*fs.File) error
 	}
 )

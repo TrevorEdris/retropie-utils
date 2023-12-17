@@ -48,7 +48,7 @@ type (
 
 func NewFile(absolutePath string, lastModified time.Time) *File {
 	return &File{
-		Dir:          filepath.Dir(absolutePath),
+		Dir:          filepath.Base(filepath.Dir(absolutePath)),
 		Absolute:     absolutePath,
 		Name:         filepath.Base(absolutePath),
 		LastModified: lastModified,

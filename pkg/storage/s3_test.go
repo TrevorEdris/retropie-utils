@@ -16,9 +16,9 @@ var _ = Describe("S3", func() {
 				Enabled: false,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			err = client.Store(context.TODO(), nil)
+			err = client.Store(context.TODO(), "", nil)
 			Expect(err).NotTo(HaveOccurred())
-			err = client.StoreAll(context.TODO(), nil)
+			err = client.StoreAll(context.TODO(), "", nil)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

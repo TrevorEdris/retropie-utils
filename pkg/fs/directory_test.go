@@ -68,7 +68,7 @@ var _ = Describe("Directory", func() {
 			Expect(matchingFiles[0].Absolute).To(Equal(
 				filepath.Join(dir, "ffff.gb"),
 			))
-			Expect(matchingFiles[0].Dir).To(Equal(dir))
+			Expect(matchingFiles[0].Dir).To(Equal("flat"))
 		})
 	})
 
@@ -128,7 +128,8 @@ var _ = Describe("Directory", func() {
 			Expect(matchingFiles).To(HaveLen(3))
 			for _, mf := range matchingFiles {
 				Expect(mf.Name).To(Equal("ffff.gb"))
-				Expect(mf.Dir).To(ContainSubstring(filepath.Join(dir, "sub")))
+				Expect(mf.Absolute).To(ContainSubstring(filepath.Join(dir, "sub")))
+				Expect(mf.Dir).To(ContainSubstring("sub"))
 			}
 		})
 	})

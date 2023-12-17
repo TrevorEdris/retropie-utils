@@ -14,9 +14,9 @@ var _ = Describe("Sftp", func() {
 	It("is not implemented", func() {
 		client, err := storage.NewSFTPStorage(storage.SFTPConfig{})
 		Expect(err).NotTo(HaveOccurred())
-		err = client.Store(context.TODO(), nil)
+		err = client.Store(context.TODO(), "", nil)
 		Expect(err).To(MatchError(errors.NotImplementedError))
-		err = client.StoreAll(context.TODO(), nil)
+		err = client.StoreAll(context.TODO(), "", nil)
 		Expect(err).To(MatchError(errors.NotImplementedError))
 	})
 })
