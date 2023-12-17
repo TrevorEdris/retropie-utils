@@ -17,6 +17,8 @@ type (
 	}
 )
 
+var _ Storage = &gdrive{}
+
 func NewGoogleDriveStorage(cfg GDriveConfig) (Storage, error) {
 	return &gdrive{cfg}, nil
 }

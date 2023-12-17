@@ -26,6 +26,8 @@ type (
 	}
 )
 
+var _ Storage = &s3{}
+
 func NewS3Storage(cfg S3Config) (Storage, error) {
 	awscfg, err := newAwsConfig(context.TODO())
 	if err != nil {

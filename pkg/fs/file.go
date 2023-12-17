@@ -11,28 +11,28 @@ const (
 	Rom FileType = iota
 	Save
 	State
-	Generic
+	Other
 )
 
 var (
 	suffixToFileType = map[string]FileType{
 		// Roms
-		"gb":  Rom,
-		"gbc": Rom,
-		"gba": Rom,
-		"smc": Rom,
-		"z64": Rom,
-		"nes": Rom,
+		".gb":  Rom,
+		".gbc": Rom,
+		".gba": Rom,
+		".smc": Rom,
+		".z64": Rom,
+		".nes": Rom,
 		// Saves
-		"srm": Save,
-		"sav": Save,
-		"rtc": Save,
+		".srm": Save,
+		".sav": Save,
+		".rtc": Save,
 		// States
-		"state":  State,
-		"state1": State,
-		"state2": State,
-		"state3": State,
-		"state4": State,
+		".state":  State,
+		".state1": State,
+		".state2": State,
+		".state3": State,
+		".state4": State,
 	}
 )
 
@@ -61,9 +61,10 @@ func (f *File) IsOlderThan(other *File) bool {
 }
 
 func parseFiletype(filename string) FileType {
-	ft, ok := suffixToFileType[filepath.Ext(filename)]
+	ext := filepath.Ext(filename)
+	ft, ok := suffixToFileType[ext]
 	if !ok {
-		return Generic
+		return Other
 	}
 	return ft
 }

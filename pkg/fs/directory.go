@@ -9,6 +9,7 @@ type (
 	Directory interface {
 		GetName() string
 		GetAbsolutePath() string
+		GetAllFiles() []*File
 		GetMatchingFiles(filetype FileType) ([]*File, error)
 		RepopulateFiles() error
 	}
@@ -63,7 +64,7 @@ func (d *directory) RepopulateFiles() error {
 		}
 		if !info.IsDir() {
 			files = append(files, NewFile(
-				filepath.Join(path, info.Name()),
+				path,
 				info.ModTime(),
 			))
 		}
@@ -72,6 +73,7 @@ func (d *directory) RepopulateFiles() error {
 	if err != nil {
 		return err
 	}
+	d.Files = files
 
 	return nil
 }
