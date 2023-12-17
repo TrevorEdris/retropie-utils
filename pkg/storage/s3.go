@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/TrevorEdris/retropie-utils/pkg/fs"
+	"github.com/TrevorEdris/retropie-utils/pkg/log"
+	"github.com/rotisserie/eris"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -48,26 +50,27 @@ func (s *s3) Store(ctx context.Context, remoteDir string, file *fs.File) error {
 
 	f, err := os.Open(file.Absolute)
 	if err != nil {
-		return err
+		return eris.Wrap(err, "failed to open file")
 	}
 	defer f.Close()
 
 	remoteDir, _ = strings.CutSuffix(remoteDir, "/")
-	dir := fmt.Sprintf("%s/%s", file.Dir, file.Name)
+	key := fmt.Sprintf("%s/%s", file.Dir, file.Name)
 	if remoteDir != "" {
-		dir = fmt.Sprintf("%s/%s", remoteDir, dir)
+		key = fmt.Sprintf("%s/%s", remoteDir, key)
 	}
+	log.FromCtx(ctx).Sugar().Infof("Uploading %s to %s/%s", file.Absolute, s.cfg.Bucket, key)
 
 	_, err = s.uploader.Upload(
 		ctx,
 		&awss3.PutObjectInput{
 			Bucket: aws.String(s.cfg.Bucket),
-			Key:    aws.String(fmt.Sprintf("%s/%s/%s", remoteDir, file.Dir, file.Name)),
+			Key:    aws.String(key),
 			Body:   f,
 		},
 	)
 	if err != nil {
-		return err
+		return eris.Wrap(err, "failed to upload")
 	}
 
 	return nil

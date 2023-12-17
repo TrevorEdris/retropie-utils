@@ -1,6 +1,7 @@
 package fs_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
@@ -9,11 +10,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/TrevorEdris/retropie-utils/pkg/fs"
+	"github.com/TrevorEdris/retropie-utils/pkg/log"
 )
 
 var _ = Describe("Directory", func() {
 	var (
 		tempDir = filepath.Join(os.TempDir(), uuid.New().String())
+		ctx     = log.ToCtx(context.Background(), log.FromCtx(context.Background()))
 	)
 
 	BeforeEach(func() {
@@ -49,7 +52,7 @@ var _ = Describe("Directory", func() {
 		})
 
 		It("lists all files in the directory", func() {
-			d, err := fs.NewDirectory(dir)
+			d, err := fs.NewDirectory(ctx, dir)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(d.GetAbsolutePath()).To(Equal(dir))
 			Expect(d.GetName()).To(Equal("flat"))
@@ -58,7 +61,7 @@ var _ = Describe("Directory", func() {
 		})
 
 		It("gets matching files", func() {
-			d, err := fs.NewDirectory(dir)
+			d, err := fs.NewDirectory(ctx, dir)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(d.GetAbsolutePath()).To(Equal(dir))
 			matchingFiles, err := d.GetMatchingFiles(fs.Rom)
@@ -111,7 +114,7 @@ var _ = Describe("Directory", func() {
 		})
 
 		It("lists all files in subdirectories also", func() {
-			d, err := fs.NewDirectory(dir)
+			d, err := fs.NewDirectory(ctx, dir)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(d.GetAbsolutePath()).To(Equal(dir))
 			Expect(d.GetName()).To(Equal("nonflat"))
@@ -120,7 +123,7 @@ var _ = Describe("Directory", func() {
 		})
 
 		It("gets matching files", func() {
-			d, err := fs.NewDirectory(dir)
+			d, err := fs.NewDirectory(ctx, dir)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(d.GetAbsolutePath()).To(Equal(dir))
 			matchingFiles, err := d.GetMatchingFiles(fs.Rom)
