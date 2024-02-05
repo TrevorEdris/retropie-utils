@@ -39,7 +39,7 @@ the corresponding sync for that file type is enabled.`,
 		}
 		fmt.Printf("Running sync with config:\n%s", string(b))
 
-		s, err := syncer.NewSyncer(cfg)
+		s, err := syncer.NewSyncer(ctx, cfg)
 		if err != nil {
 			panic(err)
 		}

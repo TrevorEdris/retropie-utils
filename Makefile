@@ -7,6 +7,7 @@ LOCAL_OUTPUT=_output
 GOOS=$(shell go env GOOS)
 GOARCH=$(shell go env GOARCH)
 GIT_HASH=$(shell git rev-parse --short HEAD)
+DEV_DOCKER_COMPOSE=docker-compose.dev.yaml
 
 show:
 	@echo ${GOOS}
@@ -62,3 +63,15 @@ vet:
 # TODO: Address lint issues... oh my so many
 lint:
 	golangci-lint run --enable-all ./...
+
+.PHONY: dev
+dev: ## Run the apps locally and print logs to stdout
+	docker-compose -f ${DEV_DOCKER_COMPOSE} up
+
+.PHONY: dev-down
+dev-down: ## Stop all containers
+	docker-compose -f ${DEV_DOCKER_COMPOSE} down
+
+.PHONY: dev-restart
+dev-restart: ## Restart all containers
+	docker-compose -f ${DEV_DOCKER_COMPOSE} restart

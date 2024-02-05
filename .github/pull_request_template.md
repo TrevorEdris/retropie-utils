@@ -1,6 +1,6 @@
 ## Issue Link
 
-github.com/TrevorEdris/retropie-utils/issues/ISSUE_NUMBER_HERE
+https://github.com/TrevorEdris/retropie-utils/issues/ISSUE_NUMBER_HERE
 
 ## Motivation
 

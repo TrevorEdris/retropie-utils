@@ -12,7 +12,7 @@ import (
 var _ = Describe("S3", func() {
 	When("storage is not enabled", func() {
 		It("is a no-op", func() {
-			client, err := storage.NewS3Storage(storage.S3Config{
+			client, err := storage.NewS3Storage(context.TODO(), storage.S3Config{
 				Enabled: false,
 			})
 			Expect(err).NotTo(HaveOccurred())

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -9,38 +10,96 @@ import (
 	"github.com/TrevorEdris/retropie-utils/pkg/fs"
 	"github.com/TrevorEdris/retropie-utils/pkg/log"
 	"github.com/rotisserie/eris"
+	"go.uber.org/zap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type (
 	s3 struct {
-		awsCfg   config.Config
-		uploader *manager.Uploader
-		cfg      S3Config
+		awsCfg             config.Config
+		client             *awss3.Client
+		uploader           *manager.Uploader
+		cfg                S3Config
+		resourcesValidated bool
 	}
 
 	S3Config struct {
-		Enabled bool
-		Bucket  string
+		Bucket                 string
+		Enabled                bool
+		CreateMissingResources bool
 	}
 )
 
 var _ Storage = &s3{}
 
-func NewS3Storage(cfg S3Config) (Storage, error) {
-	awscfg, err := newAwsConfig(context.TODO())
+func NewS3Storage(ctx context.Context, cfg S3Config) (Storage, error) {
+	awscfg, err := newAwsConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
+	client := awss3.NewFromConfig(awscfg, func(o *awss3.Options) {
+		o.UsePathStyle = true
+	})
 	return &s3{
 		awsCfg:   awscfg,
-		uploader: manager.NewUploader(awss3.NewFromConfig(awscfg)),
+		client:   client,
+		uploader: manager.NewUploader(client),
 		cfg:      cfg,
 	}, nil
+}
+
+func (s *s3) Init(ctx context.Context) error {
+	// Validate required S3 resources exist
+	exist, err := s.checkIfResourcesExist(ctx)
+	if err != nil {
+		return err
+	}
+
+	// If they do not exist, create them if config is enabled
+	if !exist && s.cfg.CreateMissingResources {
+		err = s.createMissingResources(ctx)
+		if err != nil {
+			return err
+		}
+		s.resourcesValidated = true
+	}
+
+	return nil
+}
+
+func (s *s3) checkIfResourcesExist(ctx context.Context) (bool, error) {
+	_, err := s.client.HeadBucket(ctx, &awss3.HeadBucketInput{
+		Bucket: aws.String(s.cfg.Bucket),
+	})
+	if err == nil {
+		log.FromCtx(ctx).Info("Bucket exists", zap.String("bucket", s.cfg.Bucket))
+		return true, nil
+	}
+
+	var notFoundErr *types.NotFound
+	if errors.As(err, &notFoundErr) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (s *s3) createMissingResources(ctx context.Context) error {
+	_, err := s.client.CreateBucket(
+		ctx,
+		&awss3.CreateBucketInput{
+			Bucket: aws.String(s.cfg.Bucket),
+		})
+	if err != nil {
+		log.FromCtx(ctx).Error("Failed to create bucket", zap.String("bucket", s.cfg.Bucket), zap.Error(err))
+		return err
+	}
+	log.FromCtx(ctx).Info("Successfully created bucket", zap.String("bucket", s.cfg.Bucket))
+	return nil
 }
 
 func (s *s3) Store(ctx context.Context, remoteDir string, file *fs.File) error {

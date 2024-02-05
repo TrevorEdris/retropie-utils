@@ -1,0 +1,10 @@
+sync:
+  roms: false
+  saves: true
+  states: true
+romsfolder: "/app/tools/syncer/example/roms"
+storage:
+  s3:
+    enabled: true
+    bucket: retropie-backups
+    createMissingResources: true
