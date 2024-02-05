@@ -35,11 +35,11 @@ const (
 	timeToDirFmt = "2006/01/02/15"
 )
 
-func NewSyncer(cfg Config) (Syncer, error) {
+func NewSyncer(ctx context.Context, cfg Config) (Syncer, error) {
 	var storageClient storage.Storage
 	var err error
 	if cfg.Storage.S3.Enabled {
-		storageClient, err = storage.NewS3Storage(cfg.Storage.S3)
+		storageClient, err = storage.NewS3Storage(ctx, cfg.Storage.S3)
 	} else if cfg.Storage.SFTP.Enabled {
 		storageClient, err = storage.NewSFTPStorage(cfg.Storage.SFTP)
 	} else if cfg.Storage.GoogleDrive.Enabled {
@@ -50,6 +50,7 @@ func NewSyncer(cfg Config) (Syncer, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = storageClient.Init(ctx)
 	if err != nil {
 		return nil, err
 	}

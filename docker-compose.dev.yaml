@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  localstack:
+    container_name: localstack
+    image: localstack/localstack
+    ports:
+      # - "127.0.0.1:4566:4566"            # LocalStack Gateway
+      # - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+      - "4566:4566"
+    environment:
+      SERVICES: dynamodb,s3
+      DEBUG: ${DEBUG:-0}
+      # DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin
+    container_name: dynamodb-admin
+    depends_on:
+      - localstack
+    ports:
+      - "8001:8001"
+    environment:
+      DYNAMO_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AWS_REGION: us-east-1
+
+  syncer:
+    build:
+      context: ${PWD}
+      dockerfile: ./Dockerfile.dev
+    container_name: syncer
+    depends_on:
+      - localstack
+    links:
+      - localstack
+    environment:
+      #SSH_AUTH_SOCK: /run/host-services/ssh-auth.sock
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: http://localstack:4566
+    volumes:
+      - ${PWD}/:/app
+      # - type: bind
+      #   source: /run/host-services/ssh-auth.sock
+      #   target: /run/host-services/ssh-auth.sock
+    restart: unless-stopped
+    ports:
+      - "8000:8000"

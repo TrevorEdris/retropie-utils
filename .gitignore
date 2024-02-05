@@ -182,3 +182,5 @@ cython_debug/
 # Go workspace file
 go.work
 _output
+volume/
+tmp/

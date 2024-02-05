@@ -27,6 +27,10 @@ func NewSFTPStorage(cfg SFTPConfig) (Storage, error) {
 	return &sftp{cfg}, nil
 }
 
+func (s *sftp) Init(ctx context.Context) error {
+	return errors.NotImplementedError
+}
+
 func (s *sftp) Store(ctx context.Context, remoteDir string, file *fs.File) error {
 	return errors.NotImplementedError
 }

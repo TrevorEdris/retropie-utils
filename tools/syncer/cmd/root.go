@@ -46,6 +46,9 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.syncer/config.yaml)")
+	_ = viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	viper.SetEnvPrefix("SYNCER")
+	viper.AutomaticEnv() // read in environment variables that match
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -55,9 +58,11 @@ func init() {
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	if cfgFile != "" {
+		fmt.Fprintln(os.Stdout, "Using config file "+cfgFile)
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
+		fmt.Fprintln(os.Stdout, "No config file arg provided; searching in $HOME/.syncer")
 		// Find home directory.
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
@@ -75,8 +80,6 @@ func initConfig() {
 		viper.SetConfigType("yaml")
 		viper.SetConfigName("config")
 	}
-
-	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
