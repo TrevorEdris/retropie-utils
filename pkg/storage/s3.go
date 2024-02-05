@@ -2,22 +2,21 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
 	"github.com/TrevorEdris/retropie-utils/pkg/fs"
 	"github.com/TrevorEdris/retropie-utils/pkg/log"
-	"github.com/aws/smithy-go"
 	"github.com/rotisserie/eris"
 	"go.uber.org/zap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type (
@@ -81,17 +80,11 @@ func (s *s3) checkIfResourcesExist(ctx context.Context) (bool, error) {
 		log.FromCtx(ctx).Info("Bucket exists", zap.String("bucket", s.cfg.Bucket))
 		return true, nil
 	}
-	// What in the fuck is this Amazon
-	// Why do you make my life hell
-	if opErr, ok := err.(*smithy.OperationError); ok {
-		if httpErr, ok := opErr.Err.(*awsHttp.ResponseError); ok {
-			if httpErr.HTTPStatusCode() == http.StatusNotFound {
-				log.FromCtx(ctx).Warn("Bucket does not exist", zap.String("bucket", s.cfg.Bucket))
-				return false, nil
-			}
-		}
+
+	var notFoundErr *types.NotFound
+	if errors.As(err, &notFoundErr) {
+		return false, nil
 	}
-	log.FromCtx(ctx).Error("Unexpected error checking if bucket exists", zap.String("bucket", s.cfg.Bucket), zap.Error(err))
 	return false, err
 }
 
