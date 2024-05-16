@@ -19,9 +19,7 @@ type (
 	}
 
 	Storage struct {
-		GoogleDrive storage.GDriveConfig `mapstructure:"googleDrive"`
-		S3          storage.S3Config     `mapstructure:"s3"`
-		SFTP        storage.SFTPConfig   `mapstructure:"sftp"`
+		S3 storage.S3Config `mapstructure:"s3"`
 	}
 
 	Sync struct {
@@ -33,15 +31,9 @@ type (
 
 var example = Config{
 	Storage: Storage{
-		GoogleDrive: storage.GDriveConfig{
-			Enabled: false,
-		},
 		S3: storage.S3Config{
 			Enabled: true,
 			Bucket:  "retropie-sync",
-		},
-		SFTP: storage.SFTPConfig{
-			Enabled: false,
 		},
 	},
 	Sync: Sync{

@@ -48,11 +48,10 @@ prepare_tests:
 test:
 	ginkgo -v ./...
 
-# TODO: Choose between `wslview` and `open`
 test_coverage: prepare_tests
 	go test -v --cover --covermode=count --coverprofile=${LOCAL_OUTPUT}/testcoverage.cov ./...
 	go tool cover -html ${LOCAL_OUTPUT}/testcoverage.cov -o ${LOCAL_OUTPUT}/testcoverage.html
-	wslview ${LOCAL_OUTPUT}/testcoverage.html
+	@echo "Open ${LOCAL_OUTPUT}/testcoverage.html in a web browser to view the test coverage"
 
 dep:
 	go mod download
