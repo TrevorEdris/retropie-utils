@@ -40,10 +40,6 @@ func NewSyncer(ctx context.Context, cfg Config) (Syncer, error) {
 	var err error
 	if cfg.Storage.S3.Enabled {
 		storageClient, err = storage.NewS3Storage(ctx, cfg.Storage.S3)
-	} else if cfg.Storage.SFTP.Enabled {
-		storageClient, err = storage.NewSFTPStorage(cfg.Storage.SFTP)
-	} else if cfg.Storage.GoogleDrive.Enabled {
-		storageClient, err = storage.NewGoogleDriveStorage(cfg.Storage.GoogleDrive)
 	} else {
 		err = eris.New("no storage clients enabled")
 	}
