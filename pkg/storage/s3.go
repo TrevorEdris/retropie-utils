@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	myerrors "github.com/TrevorEdris/retropie-utils/pkg/errors"
 	"os"
 	"strings"
 
@@ -70,6 +71,10 @@ func (s *s3) Init(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *s3) Retrieve(ctx context.Context, request RetrieveFileRequest) (*fs.File, error) {
+	return nil, myerrors.NotImplementedError
 }
 
 func (s *s3) checkIfResourcesExist(ctx context.Context) (bool, error) {
