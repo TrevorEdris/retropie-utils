@@ -9,10 +9,6 @@ import (
 )
 
 var _ = Describe("Config", func() {
-	It("compiles", func() {
-		Expect(nil).To(BeNil())
-	})
-
 	validConfig := syncer.Config{
 		Username: "asdf1234",
 		Storage: syncer.Storage{
