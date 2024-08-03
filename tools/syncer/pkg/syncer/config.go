@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"unicode"
 
+	"github.com/TrevorEdris/retropie-utils/pkg/errors"
 	"github.com/TrevorEdris/retropie-utils/pkg/storage"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
@@ -13,6 +15,7 @@ import (
 type (
 	// TODO: Allow for arbitrary locations?
 	Config struct {
+		Username   string  `mapstructure:"username" validate:"required"`
 		Storage    Storage `mapstructure:"storage"`
 		RomsFolder string  `mapstructure:"romsFolder"`
 		Sync       Sync    `mapstructure:"sync"`
@@ -29,7 +32,19 @@ type (
 	}
 )
 
+const (
+	DefaultUsername = "DEFAULT_USERNAME_CHANGE_THIS_VALUE"
+
+	UsernameMinLength = 3
+	UsernameMaxLength = 1024
+)
+
+var (
+	additionalUsernameChars = []rune{'-', '_', '.'}
+)
+
 var example = Config{
+	Username: DefaultUsername,
 	Storage: Storage{
 		S3: storage.S3Config{
 			Enabled: true,
@@ -45,6 +60,10 @@ var example = Config{
 
 var validate *validator.Validate
 
+func init() {
+	validate = validator.New()
+}
+
 func CreateExample(outputDir string) error {
 	err := os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
@@ -55,7 +74,12 @@ func CreateExample(outputDir string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(f)
 	userHomeDir, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -73,9 +97,7 @@ func CreateExample(outputDir string) error {
 	return nil
 }
 
-func ValidateConfig(configFile string) error {
-	validate = validator.New()
-
+func ValidateConfigFile(configFile string) error {
 	bytes, err := os.ReadFile(configFile)
 	if err != nil {
 		return err
@@ -86,9 +108,59 @@ func ValidateConfig(configFile string) error {
 		return err
 	}
 
-	err = validate.Struct(config)
+	return ValidateConfig(config)
+}
+
+func ValidateConfig(config *Config) error {
+	err := validate.Struct(config)
 	if err != nil {
 		return err
 	}
+
+	err = validateUsername(config.Username)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateUsername(username string) error {
+	if username == DefaultUsername {
+		return errors.DefaultUsernameError
+	}
+
+	if username == "" {
+		return errors.NewInvalidUsernameWithReasonError("username is empty")
+	}
+
+	err := validateContainsOnlySupportedChars(username)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateContainsOnlySupportedChars(username string) error {
+	if len(username) < UsernameMinLength || len(username) > UsernameMaxLength {
+		return errors.NewInvalidUsernameWithReasonError(fmt.Sprintf("username has invalid length; Must be %d <= length <= %d", UsernameMinLength, UsernameMaxLength))
+	}
+
+	for _, c := range username {
+		if unicode.IsLetter(c) || unicode.IsNumber(c) {
+			continue
+		}
+		isSupported := false
+		for _, r := range additionalUsernameChars {
+			if c == r {
+				isSupported = true
+			}
+		}
+		if !isSupported {
+			return errors.NewInvalidUsernameWithReasonError(fmt.Sprintf("username contains illegal character '%c'; Must be alphanumeric", c))
+		}
+	}
+
 	return nil
 }

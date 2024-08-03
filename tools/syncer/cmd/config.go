@@ -24,7 +24,7 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Add support for flags
 		configFile := getConfigFilename()
-		err := syncer.ValidateConfig(configFile)
+		err := syncer.ValidateConfigFile(configFile)
 		if err != nil {
 			fmt.Printf("Validation of config file %s failed: %s\n", configFile, err)
 			os.Exit(1)
