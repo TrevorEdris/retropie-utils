@@ -8,8 +8,8 @@ import (
 
 type (
 	RetrieveFileRequest struct {
-		Filename string
-		Emulator string
+		ToRetrieve  *fs.File
+		Destination *fs.File
 	}
 
 	Storage interface {
