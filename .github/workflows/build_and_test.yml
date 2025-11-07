@@ -43,3 +43,26 @@ jobs:
 
       - name: Test
         run: make test
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: [build]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21.4
+          check-latest: true
+
+      - name: Install tools
+        run: make install-dev-tools
+
+      - name: Verify Docker is available
+        run: docker info
+
+      - name: Integration Test
+        run: make test-integration

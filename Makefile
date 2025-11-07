@@ -74,3 +74,25 @@ dev-down: ## Stop all containers
 .PHONY: dev-restart
 dev-restart: ## Restart all containers
 	docker-compose -f ${DEV_DOCKER_COMPOSE} restart
+
+INTEGRATION_DOCKER_COMPOSE=docker-compose.integration.yaml
+
+.PHONY: test-integration
+test-integration: ## Run integration tests using testcontainers (no docker-compose needed)
+	ginkgo -v ./tools/syncer/integration/...
+
+.PHONY: test-integration-docker
+test-integration-docker: ## Run integration tests using docker-compose (alternative approach)
+	docker-compose -f ${INTEGRATION_DOCKER_COMPOSE} up -d
+	@echo "Waiting for LocalStack to be ready..."
+	@sleep 5
+	ginkgo -v ./tools/syncer/integration/...
+	docker-compose -f ${INTEGRATION_DOCKER_COMPOSE} down
+
+.PHONY: integration-up
+integration-up: ## Start integration test environment
+	docker-compose -f ${INTEGRATION_DOCKER_COMPOSE} up -d
+
+.PHONY: integration-down
+integration-down: ## Stop integration test environment
+	docker-compose -f ${INTEGRATION_DOCKER_COMPOSE} down
