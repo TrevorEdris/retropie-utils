@@ -22,8 +22,11 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Add support for flags
-		configFile := getConfigFilename()
+		// Use config file from flag if provided, otherwise use default
+		configFile := cfgFile
+		if configFile == "" {
+			configFile = getConfigFilename()
+		}
 		err := syncer.ValidateConfigFile(configFile)
 		if err != nil {
 			fmt.Printf("Validation of config file %s failed: %s\n", configFile, err)
