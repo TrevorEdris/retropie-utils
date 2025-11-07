@@ -277,6 +277,50 @@ func (s *s3) StoreAll(ctx context.Context, remoteDir string, files []*fs.File) e
 	return nil
 }
 
+func (s *s3) GetFileLastModified(ctx context.Context, remoteDir string, file *fs.File) (*time.Time, error) {
+	if !s.cfg.Enabled {
+		return nil, pkgerrors.NotImplementedError
+	}
+
+	// Construct the S3 key the same way Store does
+	remoteDir, _ = strings.CutSuffix(remoteDir, "/")
+	remoteDir = s.addPrefix(remoteDir)
+	key := fmt.Sprintf("%s/%s", file.Dir, file.Name)
+	if remoteDir != "" {
+		key = fmt.Sprintf("%s/%s", remoteDir, key)
+	}
+
+	// First, try to get metadata from DynamoDB if enabled
+	if s.dynamodbClient != nil {
+		metadata, err := s.dynamodbClient.GetFileMetadataByFile(ctx, file)
+		if err == nil && metadata != nil && metadata.LastModifiedTime > 0 {
+			lastModified := time.UnixMilli(metadata.LastModifiedTime)
+			return &lastModified, nil
+		}
+		// If DynamoDB lookup fails or returns nil, fall through to S3 HeadObject
+	}
+
+	// Use HeadObject to get metadata from S3
+	output, err := s.client.HeadObject(ctx, &awss3.HeadObjectInput{
+		Bucket: aws.String(s.cfg.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var notFoundErr *types.NotFound
+		if errors.As(err, &notFoundErr) {
+			// File doesn't exist in S3
+			return nil, nil
+		}
+		return nil, eris.Wrap(err, "failed to get file metadata from S3")
+	}
+
+	if output.LastModified == nil {
+		return nil, nil
+	}
+
+	return output.LastModified, nil
+}
+
 func (s *s3) addPrefix(remoteDir string) string {
 	return fmt.Sprintf("%s/%s", remoteDir, s.username)
 }

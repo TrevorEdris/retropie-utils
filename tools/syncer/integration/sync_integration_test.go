@@ -1,14 +1,19 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/TrevorEdris/retropie-utils/pkg/fs"
 	"github.com/TrevorEdris/retropie-utils/pkg/log"
 	"github.com/TrevorEdris/retropie-utils/tools/syncer/pkg/syncer"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -243,6 +248,170 @@ var _ = Describe("Sync Command Integration", func() {
 				objects, err := listS3Objects(ctx, env.endpoint)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(objects).To(ContainElement(expectedKey))
+			})
+		})
+
+		Context("when comparing file timestamps", func() {
+			It("uploads file when S3 file does not exist", func() {
+				// Create a new file that doesn't exist in S3
+				_, err := createTestFile(filepath.Join(env.tempRomsDir, "gb"), "new-file.srm", "new save content")
+				Expect(err).NotTo(HaveOccurred())
+
+				cfg := createSyncerConfig(env.tempRomsDir)
+				cfg.Sync = syncer.Sync{
+					Roms:   false,
+					Saves:  true,
+					States: false,
+				}
+
+				s, err := syncer.NewSyncer(ctx, cfg)
+				Expect(err).NotTo(HaveOccurred())
+
+				err = s.Sync(ctx)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify file was uploaded
+				now := time.Now()
+				remoteDir := now.Format("2006/01/02/15")
+				expectedKey := fmt.Sprintf("%s/%s/gb/new-file.srm", remoteDir, testUsername)
+
+				objects, err := listS3Objects(ctx, env.endpoint)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(objects).To(ContainElement(expectedKey))
+
+				// Verify content
+				content, err := getS3Object(ctx, env.endpoint, expectedKey)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(content)).To(Equal("new save content"))
+			})
+
+			It("uploads file when local file is newer than S3", func() {
+				// First, upload a file to S3
+				testFile, err := createTestFile(filepath.Join(env.tempRomsDir, "gb"), "timestamp-test.srm", "old content")
+				Expect(err).NotTo(HaveOccurred())
+
+				cfg := createSyncerConfig(env.tempRomsDir)
+				cfg.Sync = syncer.Sync{
+					Roms:   false,
+					Saves:  true,
+					States: false,
+				}
+
+				s, err := syncer.NewSyncer(ctx, cfg)
+				Expect(err).NotTo(HaveOccurred())
+
+				// First sync - uploads the file
+				err = s.Sync(ctx)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Wait a bit to ensure timestamp difference
+				time.Sleep(100 * time.Millisecond)
+
+				// Update the local file with new content and newer timestamp
+				newContent := "new content"
+				err = os.WriteFile(testFile.Absolute, []byte(newContent), 0644)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Update the file's modification time
+				newTime := time.Now()
+				err = os.Chtimes(testFile.Absolute, newTime, newTime)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Re-read the file to get updated LastModified
+				info, err := os.Stat(testFile.Absolute)
+				Expect(err).NotTo(HaveOccurred())
+				testFile = fs.NewFile(testFile.Absolute, info.ModTime())
+
+				// Second sync - should upload because local is newer
+				err = s.Sync(ctx)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify the file in S3 has the new content
+				now := time.Now()
+				remoteDir := now.Format("2006/01/02/15")
+				expectedKey := fmt.Sprintf("%s/%s/gb/timestamp-test.srm", remoteDir, testUsername)
+
+				content, err := getS3Object(ctx, env.endpoint, expectedKey)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(content)).To(Equal(newContent))
+			})
+
+			It("downloads file when S3 file is newer than local", func() {
+				// Create a file locally
+				testFile, err := createTestFile(filepath.Join(env.tempRomsDir, "gb"), "download-test.srm", "local old content")
+				Expect(err).NotTo(HaveOccurred())
+
+				cfg := createSyncerConfig(env.tempRomsDir)
+				cfg.Sync = syncer.Sync{
+					Roms:   false,
+					Saves:  true,
+					States: false,
+				}
+
+				s, err := syncer.NewSyncer(ctx, cfg)
+				Expect(err).NotTo(HaveOccurred())
+
+				// First sync - uploads the file
+				err = s.Sync(ctx)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Wait a bit
+				time.Sleep(100 * time.Millisecond)
+
+				// Manually upload a newer version to S3 (simulating another device)
+				now := time.Now()
+				remoteDir := now.Format("2006/01/02/15")
+				expectedKey := fmt.Sprintf("%s/%s/gb/download-test.srm", remoteDir, testUsername)
+
+				// Upload newer content directly to S3
+				s3Content := "s3 newer content"
+				cfg2, err := config.LoadDefaultConfig(ctx,
+					config.WithEndpointResolverWithOptions(
+						aws.EndpointResolverWithOptionsFunc(
+							func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+								return aws.Endpoint{
+									URL:           env.endpoint,
+									SigningRegion: region,
+									Source:        aws.EndpointSourceCustom,
+								}, nil
+							},
+						),
+					),
+				)
+				Expect(err).NotTo(HaveOccurred())
+
+				s3Client := awss3.NewFromConfig(cfg2, func(o *awss3.Options) {
+					o.UsePathStyle = true
+				})
+
+				_, err = s3Client.PutObject(ctx, &awss3.PutObjectInput{
+					Bucket: aws.String(testBucketName),
+					Key:    aws.String(expectedKey),
+					Body:   bytes.NewReader([]byte(s3Content)),
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Wait a bit more to ensure S3 timestamp is newer
+				time.Sleep(100 * time.Millisecond)
+
+				// Make local file older by setting its modification time to the past
+				pastTime := time.Now().Add(-1 * time.Hour)
+				err = os.Chtimes(testFile.Absolute, pastTime, pastTime)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Re-read the file to get updated LastModified
+				info, err := os.Stat(testFile.Absolute)
+				Expect(err).NotTo(HaveOccurred())
+				testFile = fs.NewFile(testFile.Absolute, info.ModTime())
+
+				// Second sync - should download because S3 is newer
+				err = s.Sync(ctx)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify local file was updated with S3 content
+				localContent, err := os.ReadFile(testFile.Absolute)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(localContent)).To(Equal(s3Content))
 			})
 		})
 	})
