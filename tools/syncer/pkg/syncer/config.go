@@ -49,6 +49,11 @@ var example = Config{
 		S3: storage.S3Config{
 			Enabled: true,
 			Bucket:  "retropie-sync",
+			DynamoDB: storage.DynamoDBConfig{
+				Enabled:                true,
+				TableName:              "retropie-file-metadata",
+				CreateMissingResources: true,
+			},
 		},
 	},
 	Sync: Sync{
