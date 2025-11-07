@@ -29,12 +29,14 @@ type (
 		cfg                S3Config
 		resourcesValidated bool
 		username           string
+		dynamodbClient     *DynamoDBClient
 	}
 
 	S3Config struct {
 		Bucket                 string
 		Enabled                bool
 		CreateMissingResources bool
+		DynamoDB               DynamoDBConfig
 	}
 )
 
@@ -48,13 +50,25 @@ func NewS3Storage(ctx context.Context, cfg S3Config, username string) (Storage, 
 	client := awss3.NewFromConfig(awscfg, func(o *awss3.Options) {
 		o.UsePathStyle = true
 	})
-	return &s3{
+
+	s3Storage := &s3{
 		awsCfg:   awscfg,
 		client:   client,
 		uploader: manager.NewUploader(client),
 		cfg:      cfg,
 		username: username,
-	}, nil
+	}
+
+	// Initialize DynamoDB client if enabled
+	if cfg.DynamoDB.Enabled {
+		dynamodbClient, err := NewDynamoDBClient(ctx, cfg.DynamoDB, username)
+		if err != nil {
+			return nil, eris.Wrap(err, "failed to create DynamoDB client")
+		}
+		s3Storage.dynamodbClient = dynamodbClient
+	}
+
+	return s3Storage, nil
 }
 
 func (s *s3) Init(ctx context.Context) error {
@@ -73,6 +87,14 @@ func (s *s3) Init(ctx context.Context) error {
 		s.resourcesValidated = true
 	}
 
+	// Initialize DynamoDB if enabled
+	if s.dynamodbClient != nil {
+		err = s.dynamodbClient.Init(ctx)
+		if err != nil {
+			return eris.Wrap(err, "failed to initialize DynamoDB")
+		}
+	}
+
 	return nil
 }
 
@@ -83,58 +105,29 @@ func (s *s3) Retrieve(ctx context.Context, request RetrieveFileRequest) (*fs.Fil
 	if request.ToRetrieve == nil || request.Destination == nil {
 		return nil, pkgerrors.NotImplementedError
 	}
-	// Construct key to match Store: {remoteDir}/{username}/{file.Dir}/{file.Name}
-	// Store constructs: remoteDir (after addPrefix) + "/" + file.Dir + "/" + file.Name
-	// where addPrefix adds username: remoteDir + "/" + username
-	// For Retrieve, ToRetrieve.Dir should be structured as "{remoteDir}/{file.Dir}"
-	// We split it: last component is file.Dir, everything before is remoteDir
-	dirParts := strings.Split(request.ToRetrieve.Dir, "/")
-	if len(dirParts) < 2 {
-		// If there's only one component, treat it as file.Dir with empty remoteDir
-		key := fmt.Sprintf("%s/%s/%s", s.username, request.ToRetrieve.Dir, request.ToRetrieve.Name)
-		log.FromCtx(ctx).Info("Downloading file", zap.String("bucket", s.cfg.Bucket), zap.String("key", key))
-		output, err := s.client.GetObject(ctx, &awss3.GetObjectInput{
-			Bucket: aws.String(s.cfg.Bucket),
-			Key:    aws.String(key),
-		})
-		if err != nil {
-			return nil, err
-		}
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				log.FromCtx(ctx).Error("Failed to close body of output", zap.Error(err))
-			}
-		}(output.Body)
 
-		// Open the destination file with create/overwrite permissions
-		localFile, err := os.OpenFile(request.Destination.Absolute, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-		if err != nil {
-			return nil, err
-		}
-		defer func() {
-			err := localFile.Close()
-			if err != nil {
-				log.FromCtx(ctx).Error("Failed to close downloaded file", zap.Error(err))
-			}
-		}()
+	var key string
 
-		// Write the downloaded content to the destination file
-		_, err = io.Copy(localFile, output.Body)
+	// If DynamoDB is enabled, look up the S3 location from metadata
+	if s.dynamodbClient != nil {
+		metadata, err := s.dynamodbClient.GetFileMetadataByFile(ctx, request.ToRetrieve)
 		if err != nil {
-			return nil, fmt.Errorf("failed to write to temp file: %w", err)
+			return nil, eris.Wrap(err, "failed to get file metadata from DynamoDB")
 		}
-
-		f := fs.NewFile(request.Destination.Absolute, time.Now())
-		// Override the Name to match the original file name, not the destination filename
-		f.Name = request.ToRetrieve.Name
-		return f, nil
+		if metadata != nil && metadata.S3Location != "" {
+			// Extract just the key from the full S3 location (remove bucket if present)
+			key = metadata.S3Location
+			log.FromCtx(ctx).Info("Found S3 location in DynamoDB", zap.String("key", key))
+		} else {
+			// Fall back to constructing key if not found in DynamoDB
+			log.FromCtx(ctx).Warn("File not found in DynamoDB, falling back to key construction", zap.String("file", request.ToRetrieve.Name))
+			key = s.constructKey(request.ToRetrieve)
+		}
+	} else {
+		// Fall back to original behavior: construct key from request
+		key = s.constructKey(request.ToRetrieve)
 	}
 
-	// Split: last component is file.Dir, everything before is remoteDir
-	fileDir := dirParts[len(dirParts)-1]
-	remoteDir := strings.Join(dirParts[:len(dirParts)-1], "/")
-	key := fmt.Sprintf("%s/%s/%s/%s", remoteDir, s.username, fileDir, request.ToRetrieve.Name)
 	log.FromCtx(ctx).Info("Downloading file", zap.String("bucket", s.cfg.Bucket), zap.String("key", key))
 	output, err := s.client.GetObject(ctx, &awss3.GetObjectInput{
 		Bucket: aws.String(s.cfg.Bucket),
@@ -173,6 +166,25 @@ func (s *s3) Retrieve(ctx context.Context, request RetrieveFileRequest) (*fs.Fil
 	f.Name = request.ToRetrieve.Name
 
 	return f, nil
+}
+
+// constructKey constructs the S3 key from the retrieve request (fallback behavior)
+func (s *s3) constructKey(toRetrieve *fs.File) string {
+	// Construct key to match Store: {remoteDir}/{username}/{file.Dir}/{file.Name}
+	// Store constructs: remoteDir (after addPrefix) + "/" + file.Dir + "/" + file.Name
+	// where addPrefix adds username: remoteDir + "/" + username
+	// For Retrieve, ToRetrieve.Dir should be structured as "{remoteDir}/{file.Dir}"
+	// We split it: last component is file.Dir, everything before is remoteDir
+	dirParts := strings.Split(toRetrieve.Dir, "/")
+	if len(dirParts) < 2 {
+		// If there's only one component, treat it as file.Dir with empty remoteDir
+		return fmt.Sprintf("%s/%s/%s", s.username, toRetrieve.Dir, toRetrieve.Name)
+	}
+
+	// Split: last component is file.Dir, everything before is remoteDir
+	fileDir := dirParts[len(dirParts)-1]
+	remoteDir := strings.Join(dirParts[:len(dirParts)-1], "/")
+	return fmt.Sprintf("%s/%s/%s/%s", remoteDir, s.username, fileDir, toRetrieve.Name)
 }
 
 func (s *s3) checkIfResourcesExist(ctx context.Context) (bool, error) {
@@ -239,6 +251,17 @@ func (s *s3) Store(ctx context.Context, remoteDir string, file *fs.File) error {
 	)
 	if err != nil {
 		return eris.Wrap(err, "failed to upload")
+	}
+
+	// Store metadata in DynamoDB if enabled
+	if s.dynamodbClient != nil {
+		err = s.dynamodbClient.StoreFileMetadata(ctx, key, file, remoteDir)
+		if err != nil {
+			// Log error but don't fail the upload
+			log.FromCtx(ctx).Error("Failed to store file metadata in DynamoDB", zap.Error(err), zap.String("key", key))
+			// Optionally return error if you want to fail the upload on DynamoDB failure
+			// return eris.Wrap(err, "failed to store file metadata")
+		}
 	}
 
 	return nil

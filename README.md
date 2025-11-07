@@ -13,7 +13,7 @@ TODO
 
 - [Docker](https://docs.docker.com/engine/install/)
 - Make (`sudo apt-get install make`)
-- [Go 1.21.4](https://github.com/moovweb/gvm?tab=readme-ov-file#installing)
+- [Go 1.23](https://github.com/moovweb/gvm?tab=readme-ov-file#installing)
 
 ### Running
 
@@ -33,7 +33,7 @@ localstack        | LocalStack version: 3.1.1.dev
 syncer            |
 syncer            |   __    _   ___
 syncer            |  / /\  | | | |_)
-syncer            | /_/--\ |_| |_| \_ v1.49.0, built with Go go1.21.4
+syncer            | /_/--\ |_| |_| \_ v1.49.0, built with Go go1.23
 syncer            |
 syncer            | watching .
 localstack        | LocalStack Docker container id: 1ea8d5445f5e

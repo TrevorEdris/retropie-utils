@@ -40,7 +40,7 @@ func setupTestEnvironment() (*testEnvironment, error) {
 		Image:        "localstack/localstack:latest",
 		ExposedPorts: []string{"4566/tcp"},
 		Env: map[string]string{
-			"SERVICES":           "s3",
+			"SERVICES":           "s3,dynamodb",
 			"DEFAULT_REGION":     "us-east-1",
 			"AWS_DEFAULT_REGION": "us-east-1",
 		},
@@ -324,6 +324,11 @@ func createSyncerConfig(romsDir string) syncer.Config {
 				Enabled:                true,
 				Bucket:                 testBucketName,
 				CreateMissingResources: true,
+				DynamoDB: storage.DynamoDBConfig{
+					Enabled:                true,
+					TableName:              "retropie-file-metadata",
+					CreateMissingResources: true,
+				},
 			},
 		},
 		Sync: syncer.Sync{

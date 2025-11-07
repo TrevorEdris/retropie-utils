@@ -101,7 +101,7 @@ The `helpers.go` file provides utilities for:
 ## Requirements
 
 - Docker (for testcontainers)
-- Go 1.21.4+
+- Go 1.23+
 - Ginkgo v2
 - Gomega
 
