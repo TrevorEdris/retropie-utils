@@ -39,7 +39,7 @@ func NewSyncer(ctx context.Context, cfg Config) (Syncer, error) {
 	var storageClient storage.Storage
 	var err error
 	if cfg.Storage.S3.Enabled {
-		storageClient, err = storage.NewS3Storage(ctx, cfg.Storage.S3)
+		storageClient, err = storage.NewS3Storage(ctx, cfg.Storage.S3, cfg.Username)
 	} else {
 		err = eris.New("no storage clients enabled")
 	}
