@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/TrevorEdris/retropie-utils/pkg/fs"
@@ -101,9 +102,50 @@ func (s *syncer) sync(ctx context.Context, sourceDir fs.Directory, filetype fs.F
 		return nil
 	}
 	log.FromCtx(ctx).Sugar().Infof("Found %d matching files", len(files))
-	err = s.storage.StoreAll(ctx, remoteDir, files)
-	if err != nil {
-		return err
+
+	for _, file := range files {
+		// Get the last modified time of the file in S3
+		s3LastModified, err := s.storage.GetFileLastModified(ctx, remoteDir, file)
+		if err != nil {
+			log.FromCtx(ctx).Error("Failed to get S3 file last modified time", zap.Error(err), zap.String("file", file.Name))
+			return err
+		}
+
+		// If S3 file doesn't exist or local file is newer, upload to S3
+		if s3LastModified == nil || file.LastModified.After(*s3LastModified) {
+			log.FromCtx(ctx).Info("Local file is newer or S3 file doesn't exist, uploading",
+				zap.String("file", file.Name),
+				zap.Time("localModified", file.LastModified),
+				zap.Any("s3Modified", s3LastModified))
+			err = s.storage.Store(ctx, remoteDir, file)
+			if err != nil {
+				return err
+			}
+		} else {
+			// S3 file exists and is newer, download to replace local file
+			log.FromCtx(ctx).Info("S3 file is newer, downloading to replace local file",
+				zap.String("file", file.Name),
+				zap.Time("localModified", file.LastModified),
+				zap.Time("s3Modified", *s3LastModified))
+
+			// Retrieve will use DynamoDB to find the latest S3 location if available,
+			// or fall back to constructing the key from ToRetrieve.Dir
+			// For the fallback case, constructKey expects ToRetrieve.Dir to be "{remoteDir}/{file.Dir}"
+			toRetrieve := &fs.File{
+				Dir:      fmt.Sprintf("%s/%s", remoteDir, file.Dir),
+				Name:     file.Name,
+				Absolute: file.Absolute,
+			}
+
+			_, err = s.storage.Retrieve(ctx, storage.RetrieveFileRequest{
+				ToRetrieve:  toRetrieve,
+				Destination: file,
+			})
+			if err != nil {
+				return err
+			}
+		}
 	}
+
 	return nil
 }
