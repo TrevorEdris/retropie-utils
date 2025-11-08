@@ -6,8 +6,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/TrevorEdris/retropie-utils/pkg/log"
+	"github.com/TrevorEdris/retropie-utils/pkg/telemetry"
 	"github.com/TrevorEdris/retropie-utils/tools/syncer/pkg/syncer"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,8 +30,29 @@ the corresponding sync for that file type is enabled.`,
 		ctx := context.Background()
 		ctx = log.ToCtx(ctx, log.FromCtx(ctx))
 
+		// Initialize telemetry
+		err := telemetry.Init(ctx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to initialize telemetry: %v\n", err)
+			// Continue without telemetry
+		} else {
+			// Initialize metrics
+			err = telemetry.InitMetrics()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to initialize metrics: %v\n", err)
+			}
+			// Setup graceful shutdown
+			defer func() {
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := telemetry.Shutdown(shutdownCtx); err != nil {
+					fmt.Fprintf(os.Stderr, "Error shutting down telemetry: %v\n", err)
+				}
+			}()
+		}
+
 		cfg := syncer.Config{}
-		err := viper.Unmarshal(&cfg)
+		err = viper.Unmarshal(&cfg)
 		if err != nil {
 			panic(err)
 		}

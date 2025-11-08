@@ -2,8 +2,12 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  bin = "./tmp/syncer sync --config /app/tools/syncer/example/config_localstack.yaml"
+  # Build the syncer binary
+  bin = "./tmp/syncer"
   cmd = "go build -o ./tmp/syncer tools/syncer/main.go"
+  # Run the API server (not the sync command directly)
+  # The API server runs continuously and can be triggered via HTTP endpoints
+  args_bin = ["api", "--port", "8000", "--config", "/app/tools/syncer/example/config_localstack.yaml"]
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor"]
   exclude_file = []
